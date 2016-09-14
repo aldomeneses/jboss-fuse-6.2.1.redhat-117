@@ -1,0 +1,185 @@
+El presente documento pretender ayudar para la instalación de del componente de JBoss Fuse 6.2.1 sobre Fabric8
+por lo que es importante realizar los siguientes pasos que se detallan a continuación:
+
+Intalación de JBoss Fuse 6.2.1
+
+Prerequisitos:
+
+Para realizar el proceso de instalación es necesario tener encuenta las siguientes premisas:
+  a) Usuario con el que se va a ejecutar el JBoss Fuse
+  b) Ruta de instalación de JBoss Fuse esta ruta debe tener como propietario el usuario con el que se va a ejecutar JBoss Fuse 
+  c) Instalación de versión de Java correspondiente en esta caso la versión JDK 1.8u91
+  d) Instalación de Apache Maven 3.1.1
+  e) Tener el software necesario de JBoss Fuse el cual debe ser: jboss-fuse-full-6.2.1.redhat-117.zip
+  f) Tener dentro del servidor los archivos de configuración necesarios para el aplicativo SICEX como son:
+     1.-keystore.ImportKey
+     2.-request-flow-process.properties
+     3.-request-flow-producer.properties
+     4.-request-flow-rmi.properties
+     5.-response-flow-consumer.properties
+     6.-response-flow-process.properties
+     7.-response-flow-rmi.process
+  g) Tener dentro del servidor el archivo settings.xml 
+
+Instalación
+1.- Si tuarce en la ruta donde se llevara acabo la instalación será /data/fabric por lo que es necesario colocar el archivo: 
+    jboss-fuse-full-6.2.1.redhat-117.zip
+2.- Realizar el desempaquetado del archivo por medio del comando: 
+    
+    unzip jboss-fuse-full-6.2.1.redhat-117.zip -d .
+    
+    una vez ejecutado este comando se creara la ruta de home de JBoss Fuse que para uso de esta memoria técnica lo identificaremos
+    como JBossFuse_Home = /data/fabric/jboss-fuse-full-6.2.1.redhat-117
+3.- A continuación es necesario realizar ciertas modificaciones para dejar a punto el JBoss Fuse
+    a) Colocarse dentro de la ruta JBossFuse_Home/etc
+    b) Editar el archivo user.properties descomentando la linea 32 para que queden habilitados los usuarios de JBoss Fuse por
+       default para cada una de las instancias que formaran parte del Cluster, en este caso para las maquinas 10.159.81.21,
+       10.159.81.22 y 10.159.81.23
+    c) Editar el archivo system.properties editando lo siguientes parametros de configuración
+       1.- karaf.name = <hostname>
+       2.- activemq.host = <ip_host>
+    d) Editar el archivo org.ops4j.pax.url.mvn.cfg agregando al principio el repositorio de nexus en la variable 
+       org.ops4j.pax.url.mvn.repositories 
+       https://quark.everis.com/nexus/content/repositories/SICEC.Release@id=SICEC.Release,\ 
+    e) Realizar el copiado de los archivos de SICEX en la ruta JBossFuse_Home/etc
+    f) Realizar el copiado del archivo setting.xml dentro de la ruta <user_home>/.m2/
+    g) Verificar que el archivo settings.xml contenga el siguiente tag:
+       <server>
+       	    <id>fabric8.upload.repo</id>
+            <username>admin</username>
+            <password>admin</password>
+        </server
+4.- Ya realizada la instalación de JBoss Fuse, es necesario colocarse en directorio JBossFuse_Home/bin en el cual se encuentran 
+    scripts necesarios que serán de utilidad para el manejo de JBoss Fuse, los cuales se detallan a continuación
+    a) ./fuse: Este comando levanta el proceso de JBoss Fuse y da accesso a la consola sin ser ejecutado en background por lo que si               se coloca el comando exit se elimina el proceso
+    b) ./start: Este comando perminte levantar el proceso de JBoss Fuse en background
+    c) ./stop: Este comando mata el proceso de JBoss Fuse que se encuentra en background
+    d) ./client: Este comando permite accedar a la consola JBoss Fuse
+    
+    Ya fuese ./fuse o ./start, accedemos al JBoss Fuse para comenzar con la instalación de JBoss Fuse sobre Fabric
+ 
+Instalación de Ambientes
+
+En los pasos previos se realizo la instalación de JBoss Fuse, por lo que ahora es necesario que JBoss Fuse este sobre Fabric, 
+para ello es se deben ejectuar los siguiente comandos:
+1.- Para que JBoss Fuse este sobre Fabric es necesario ejecutar sobre el nodo que se desee que sea Maestro para ello se elige 
+    clcustomqa:
+    
+    fabric:create --zookeeper-password admin --resolver manualip --manual-ip 10.159.81.21 --wait-for-provisioning
+
+2.- En los nodos partyqa y esbqa es necesario levantar el proceso de JBoss Fuse ya sea por medio de ./fuse o ./star, una vez dentro
+    de la consola se debe ejecutar:
+
+    a) Para el caso de partyqa: 
+	fabric:join -f --zookeeper-password admin 10.159.81.21:2181 partyqa
+    
+    b) Para el caso de esbqa:
+	fabric:join -f --zookeeper-password admin 10.159.81.21:2181 esbqa
+
+3.- Para crear el cluster es necesario ejecutar el siguiente comando en el nodo clcustom:
+
+    fabric:ensemble-add partyqa esbqa
+
+Creacion y modificación de Perfiles
+
+Para JBoss Fuse con Fabric es muy importante tomar en cuenta los perfiles exitentes ya que muchos de ellos proporcionan features que
+son necesarios para el despliegue de SICEX o en su caso crear perfiles con caracteristicas particulares
+1.- Creación de perfil sicex-gateway: Para la creación de este perfil es necesario ejecutar el comando:
+
+    fabric:profile-create sicex-gateway
+
+2.- Creación de perficl sicex-activemq: Para la creación de este perfil es necesrio ejecutar el comando:
+    
+    fabric:profile-create sicex-activemq
+
+3.- Creación de perfil sicex-interoperabilidad: Para la creación de este perfil es necesario ejecutar el comando:
+
+    fabric:profile-create sicex-interoperabilidad
+
+4.- Para agregar los features necesarios para el despliegue de la aplicación SICEX es necesario realizar los siguientes ajustes
+     Camel:
+         fabric:profile-edit --features camel-netty4 sicex-interoperabilidad
+         fabric:profile-edit --features camel sicex-interoperabilidad
+         fabric:profile-edit --features activemq-camel sicex-interoperabilidad
+         profile-edit --feature camel-quartz sicex-interoperabilidad
+         profile-edit --features camel-cxf sicex-interoperabilidad
+         profile-edit --features camel-rmi sicex-interoperabilidad
+     ActiveMQ
+         fabric:profile-edit --features activemq sicex-activemq
+     Smooks
+         profile-edit --repository  mvn:org.switchyard.karaf/switchyard/2.0.1.redhat-621117/xml/core-features sicex-interoperabilidad
+         profile-edit --feature smooks sicex-interoperabilidad
+     Hibernate
+         profile-edit --feature hibernate sicex-interoperabilidad
+5.- Modificación de profile default y sicex-interoperabilidad, para poder realizar la conexión a un repositorio externo autenticado 
+    como en el caso de Nexus es necesario realizar los siguientes ajustes en los perfiles correspondientes para
+    asi poder descargar los componentes necesarios para la aplicación
+    	 profile-edit --pid io.fabric8.maven/io.fabric8.maven.settings='/home/server/.m2/settings.xml' sicex-interoperabilidad
+         profile-edit --pid io.fabric8.agent/org.ops4j.pax.url.mvn.settings='/home/server/.m2/settings.xml' sicex-interoperabilidad
+         profile-edit --pid io.fabric8.agent/org.ops4j.pax.url.mvn.repositories='https://quark.everis.com/nexus/content/repositories/SICEC.Release@id=SICEC.Release' --append sicex-interoperabilidad
+
+         profile-edit --pid io.fabric8.maven/io.fabric8.maven.settings='/data/apache-maven-3.1.1/conf/settings.xml' default
+         profile-edit --pid io.fabric8.agent/org.ops4j.pax.url.mvn.settings='/home/server/.m2/settings.xml' default
+         profile-edit --pid io.fabric8.agent/org.ops4j.pax.url.mvn.repositories='https://quark.everis.com/nexus/content/repositories/SICEC.Release@id=SICEC.Release' --append sicex-interoperabilidad
+         profile-edit --pid io.fabric8.maven/io.fabric8.maven.settings=/home/server/.m2/settings.xml default
+
+Creación de containers hijos
+Como buena practica se recompienda la creación de containers dentro de cada container padre para realizar el despliegue de los
+desarrollos, esto con la finalidad de guardar la integridad de cada nodo padre
+1.- Para la creación de un container hijo es necesario ejecutar:
+  
+   fabric:container-create-child clcustomqa sicex_clqa1
+
+2.- Si se necesita crear varios contenedores dentro de un mismo padre ejecutar:
+
+   fabric:container-create-child clcustomqa sicex_clqa 3
+
+3.- Para conectarse a un nodo hijo ejecutar:
+   
+   fabric:container-connect -u admin -p admin sicex_clqa1
+
+Instalación de componentes de SICEX
+Una vez creados los containers hijos es necesario realizar la instalación de los bundles correspondientes para la ejecución de
+SICEX para ello es necesario realizar los siguientes pasos:
+1.- Instalación de bibliotecas dependientes:
+	
+	osgi:install -s mvn:commons-pool/commons-pool/1.6
+        osgi:install -s mvn:commons-dbcp/commons-dbcp/1.4
+        osgi:install -s mvn:mysql/mysql-connector-java/5.1.35
+        osgi:install -s mvn:com.trade.sicex.everis/ruce-model-wrapper/1.0.0
+
+2.- A continuación es necesario de deslogearse del container hijo y asignar el profile sicex-interoperabilidad ya que si se prentende
+    instalar los demás componentes mandará error de dependencias por lo que hay que ejecutar:
+
+    	fabric:container-add-profile sicex_clqa1 sicex-interoperabilidad
+
+3.- Ahora el container hijo ya tiene los features necesarios para poder desplegar la aplicación SICEX
+	 osgi:install -s mvn:com.trade.sicex.everis/commons-flow/1.0.0
+         osgi:install -s mvn:com.trade.sicex.everis/request-flow-process/1.0.0
+         osgi:install -s mvn:com.trade.sicex.everis/request-flow-producer/1.0.0
+    	 osgi:install -s mvn:com.trade.sicex.everis/request-flow-rmi/1.0.0
+     	 osgi:install -s mvn:com.trade.sicex.everis/response-flow-consumer/1.0.0
+     	 osgi:install -s mvn:com.trade.sicex.everis/response-flow-process/1.0.0
+     	 osgi:install -s mvn:com.trade.sicex.everis/response-flow-rmi/1.0.0
+     	 osgi:install -s mvn:com.trade.sicex.everis/transform-flow/1.0.0
+
+
+
+Asignación de profiles a los containers
+Para que los conatainer hijo puedan tener ciertas funcionalidades las cuales no son heredadas del conatiner padre es necesario 
+realizar la asignación de un profile que las habilite por lo que es necesario ejecutar
+1.- Asignación de profile
+    fabric:container-add-profile sicex_clqa1 sicex-interoperabilidad
+2.- Cambio de profile
+    fabric:container-add-profile sicex_clqa1 sicex-interoperabilidad
+
+Eliminación de containers
+Si se desea realizar la eliminación de un container se debe ejecutar:
+
+fabric:container-delete --force <container> 
+
+Asignación de Gateway
+Para que los containers hijos se despliguen en un entorno de alta disponibilidad, es necesario que tengan el profile que proverá
+dicha caracteristica por lo que es necesario agregarlas desde la consola web de JBoss Fuse para ello es necesario accesar al profile
+correspondiente y agregar el parent que se desea para este caso sicex-gateway deberá tener como parent ""gateway-http" y "gateway-mq"
+ 
